@@ -1,0 +1,44 @@
+Name:               process-chunk
+Version:            0.2.3
+Synopsis:           Concrete types representing chunks of process output
+Homepage:           https://github.com/seereason/process-chunk
+License:            MIT
+Author:             David Fox <dsf@seereason.com>
+Maintainer:         David Fox <dsf@seereason.com>
+Category:           System
+Build-type:         Simple
+Cabal-version:      >= 1.9
+
+flag local-process-extras
+  Description: Link directly to the source of the process-extras library
+  Default: True
+  Manual: True
+
+source-repository head
+  Type:             git
+  Location:         https://github.com/seereason/process-chunk
+
+Library
+  Hs-Source-Dirs: .
+  ghc-options:      -Wall
+
+  Exposed-modules:
+    System.Process.ChunkE
+    System.Process.Chunks
+
+  Build-depends:
+    base >= 4 && < 5,
+    ListLike >= 4,
+    mtl,
+    process
+
+  if flag(local-process-extras)
+    Build-Depends: bytestring, deepseq, text
+    Hs-Source-Dirs: ../process-extras/src
+  else
+    Build-Depends: process-extras
+
+Executable process-extras-interactive-tests
+  Main-Is: tests/Interactive.hs
+  GHC-Options: -Wall -O2 -threaded -rtsopts
+  Build-Depends: base >= 4, bytestring, deepseq, HUnit, ListLike, mtl, process, process-extras, text, utf8-string, unix
