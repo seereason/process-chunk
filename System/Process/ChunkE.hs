@@ -17,6 +17,9 @@ module System.Process.ChunkE
     , putIndentedShowCommand
     , putDots
     , putDotsLn
+    , insertStart
+    , insertResult
+    , insertNewline
     , insertCommandStart
     , insertCommandResult
     , insertCommandDisplay
@@ -31,7 +34,7 @@ import Control.Monad.Trans (lift)
 import Data.ListLike (ListLike(..), ListLikeIO(hPutStr, putStr))
 import Data.Monoid (Monoid(mempty, mappend), (<>))
 import Data.String (IsString(fromString))
-import Prelude hiding (mapM, putStr, null, tail, break, sequence, length, replicate, rem)
+import Prelude hiding (mapM, putStr, null, tail, break, sequence, length, replicate, rem, head)
 import System.Exit (ExitCode(ExitFailure))
 import System.IO (stderr)
 import System.Process (ProcessHandle, CreateProcess(cmdspec, cwd), CmdSpec(..), showCommandForUser)
@@ -148,9 +151,12 @@ indentChunk nl outp errp chunk =
         tl <- doText con pre (tail x)
         return $ (if bol == BOL then [con pre] else []) <> [con (singleton nl)] <> tl
 
-dotifyChunks :: forall a c. (ListLikeLazyIO a c) => Int -> c -> [Chunk a] -> [Chunk a]
-dotifyChunks charsPerDot dot chunks =
+dotifyChunks :: forall a c. (ListLikeLazyIO a c, IsString a) => Int -> [Chunk a] -> [Chunk a]
+dotifyChunks charsPerDot chunks =
     evalState (Prelude.concat <$> mapM (dotifyChunk charsPerDot dot) chunks) 0
+    where
+      dot :: c
+      dot = Data.ListLike.head (fromString "." :: a)
 
 -- | dotifyChunk charsPerDot dot chunk - Replaces every charsPerDot
 -- characters in the Stdout and Stderr chunks with one dot.  Runs in
@@ -203,9 +209,27 @@ putDotsLn cpd dot chunks = putDots cpd dot chunks >>= \ r -> hPutStr stderr (fro
 
 -- | Insert a chunk displaying the command and its arguments at the
 -- beginning of the chunk list.
+insertStart :: (IsString a, ListLikeLazyIO a c, Eq c) => CreateProcess -> [Chunk a] -> [Chunk a]
+insertStart p chunks = [Stderr (fromString (" -> " ++ showCreateProcessForUser p))] <> chunks
+
+-- | Insert a chunk displaying the command and its arguments at the
+-- beginning of the chunk list.
+insertNewline :: (IsString a, ListLikeLazyIO a c, Eq c) => [Chunk a] -> [Chunk a]
+insertNewline chunks = [Stderr (fromString "\n")] <> chunks
+
+-- | Insert a chunk displaying the exit code or exception that terminates
+-- the process.
+insertResult :: (IsString a, ListLikeLazyIO a c, Eq c) => [Chunk a] -> [Chunk a]
+insertResult [] = []
+insertResult (x@(Result code) : xs) = Stderr (fromString (" -> " ++ show code ++ "\n")) : x : xs
+insertResult (x@(Exception e) : xs) = Stderr (fromString (" -> " ++ show e ++ "\n")) : x : xs
+insertResult (x : xs) = x : insertResult xs
+
+-- | Insert a chunk displaying the command and its arguments at the
+-- beginning of the chunk list.
 insertCommandStart :: (IsString a, ListLikeLazyIO a c, Eq c) =>
                       CreateProcess -> [Chunk a] -> [Chunk a]
-insertCommandStart p chunks = [Stderr (fromString (" -> " ++ showCreateProcessForUser p ++ "\n"))] <> chunks
+insertCommandStart p chunks = insertStart p $ insertNewline $ chunks
 
 -- | Insert a chunk displaying the command and the result code.
 insertCommandResult :: (IsString a, ListLikeLazyIO a c, Eq c) =>

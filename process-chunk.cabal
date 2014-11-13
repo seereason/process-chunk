@@ -1,5 +1,5 @@
 Name:               process-chunk
-Version:            0.2.3
+Version:            0.3
 Synopsis:           Concrete types representing chunks of process output
 Homepage:           https://github.com/seereason/process-chunk
 License:            MIT
